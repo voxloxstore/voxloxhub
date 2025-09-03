@@ -1,0 +1,172 @@
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+
+-- إعدادات محلية
+local autoKill = true -- التشغيل التلقائي عند بدء السكربت
+local serverHopInterval = 60 -- 60 ثانية بين محاولات تغيير السيرفر
+local serverHopStartTime = os.time()
+local lastServerHopAttempt = 0
+local hopCooldown = 1 -- تبريد 30 ثانية بين المحاولات الفاشلة
+
+-- وظيفة للبحث عن سيرفر جيد
+local function findGoodServer()
+    local gameId = game.PlaceId
+    local servers = {}
+    
+    -- استخدام API للحصول على قائمة السيرفرات
+    local success, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. gameId .. "/servers/Public?sortOrder=Desc&limit=100"))
+    end)
+    
+    if success and result and result.data then
+        for _, server in ipairs(result.data) do
+            -- البحث عن سيرفر به عدد جيد من اللاعبين وليس السيرفر الحالي
+            if server.playing and server.playing >= 7 and server.playing <= 12 and server.id ~= game.JobId then
+                table.insert(servers, server)
+            end
+        end
+        
+        -- ترتيب السيرفرات حسب عدد اللاعبين (تنازلياً)
+        table.sort(servers, function(a, b)
+            return a.playing > b.playing
+        end)
+        
+        if #servers > 0 then
+            return servers[1].id
+        end
+    end
+    
+    return nil -- إذا لم يتم العثور على سيرفر مناسب
+end
+
+-- وظيفة تغيير السيرفر مع تحسينات
+local function hopServer()
+    -- التحقق من وقت التبريد الأخير
+    if os.time() - lastServerHopAttempt < hopCooldown then
+        return false
+    end
+    
+    lastServerHopAttempt = os.time()
+    
+    local goodServerId = findGoodServer()
+    if goodServerId then
+        pcall(function()
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, goodServerId)
+        end)
+        return true
+    else
+        warn("لم يتم العثور على سيرفر مناسب، سيتم المحاولة مرة أخرى بعد " .. hopCooldown .. " ثانية")
+        return false
+    end
+end
+
+-- وظيفة تفعيل الضرب السريع
+local function activateFastPunch()
+    local player = Players.LocalPlayer
+    if player and player.Backpack then
+        local punch = player.Backpack:FindFirstChild("Punch")
+        if punch then
+            punch.Parent = player.Character
+            if punch:FindFirstChild("attackTime") then
+                punch.attackTime.Value = 0.0000000000000000000000000000000001
+            end
+        end
+    end
+end
+
+-- وظيفة إيقاف الضرب السريع
+local function deactivateFastPunch()
+    local player = Players.LocalPlayer
+    if player and player.Character then
+        local equipped = player.Character:FindFirstChild("Punch")
+        if equipped then
+            equipped.Parent = player.Backpack
+            if equipped:FindFirstChild("attackTime") then
+                equipped.attackTime.Value = 0.00000000000000000000000000001
+            end
+        end
+    end
+end
+
+-- وظيفة الضرب السريع
+local function performFastPunch()
+    local player = Players.LocalPlayer
+    if player then
+        pcall(function()
+            if player:FindFirstChild("muscleEvent") then
+                player.muscleEvent:FireServer("punch", "rightHand")
+                player.muscleEvent:FireServer("punch", "leftHand")
+            end
+        end)
+        
+        local character = player.Character
+        if character then
+            local punchTool = character:FindFirstChild("Punch")
+            if punchTool then
+                punchTool:Activate()
+            end
+        end
+    end
+end
+
+-- وظيفة القتل التلقائي مع الضرب
+local function performAutoKill()
+    local player = Players.LocalPlayer
+    if not player then return end
+    
+    local character = player.Character
+    if not character then return end
+    
+    local rightHand = character:FindFirstChild("RightHand")
+    local leftHand = character:FindFirstChild("LeftHand")
+
+    -- تفعيل الضرب السريع أولاً
+    activateFastPunch()
+    
+    if rightHand and leftHand then
+        for _, target in ipairs(Players:GetPlayers()) do
+            if target ~= player and target.Character then
+                local targetChar = target.Character
+                local rootPart = targetChar:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    pcall(function()
+                        -- تنفيذ الضرب السريع
+                        performFastPunch()
+                        
+                        -- تنفيذ القتل باللمس
+                        firetouchinterest(rightHand, rootPart, 1)
+                        firetouchinterest(leftHand, rootPart, 1)
+                        firetouchinterest(rightHand, rootPart, 0)
+                        firetouchinterest(leftHand, rootPart, 0)
+                    end)
+                end
+            end
+        end
+    end
+    
+    -- التحقق إذا حان وقت تغيير السيرفر (كل 60 ثانية)
+    if os.time() - serverHopStartTime >= serverHopInterval then
+        serverHopStartTime = os.time()
+        hopServer()
+    end
+end
+
+-- بدء التشغيل التلقائي عند تحميل السكربت
+if autoKill then
+    print("بدء القتل التلقائي + تغيير السيرفر كل 60 ثانية")
+    
+    -- إعادة تعيين وقت بدء السيرفر عند التفعيل
+    serverHopStartTime = os.time()
+    
+    -- تشغيل الوظيفة عند التفعيل
+    task.spawn(function()
+        while autoKill and task.wait(0.05) do
+            performAutoKill()
+        end
+        
+        -- إيقاف الضرب عند الخروج من الحلقة
+        deactivateFastPunch()
+    end)
+end
