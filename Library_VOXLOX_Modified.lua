@@ -1180,47 +1180,11 @@ function library:AddWindow(title, options)
 						return button
 					end
 
-					function tab_data:AddSwitch(switch_text, callback)
-    local switch_data = {}
-    switch_text = tostring(switch_text or "New Switch")
-    callback = typeof(callback) == "function" and callback or function() end
+					function tab_data:AddSwitch(switch_text, callback) -- [Switch]
+						local switch_data = {}
 
-    local switch = Prefabs:FindFirstChild("Switch"):Clone()
-    switch.Parent = new_tab
-    switch:FindFirstChild("Title").Text = switch_text
-
-    switch:FindFirstChild("Title").ZIndex = switch:FindFirstChild("Title").ZIndex + (windows * 10)
-    switch.ZIndex = switch.ZIndex + (windows * 10)
-    switch:GetChildren()[1].ZIndex = switch:GetChildren()[1].ZIndex + (windows * 10)
-
-    spawn(function()
-        while true do
-            if switch and switch:GetChildren()[1] then
-                switch:GetChildren()[1].ImageColor3 = options.main_color
-            end
-            RS.Heartbeat:Wait()
-        end
-    end)
-
-    local toggled = false
-    switch.MouseButton1Click:Connect(function()
-        toggled = not toggled
-        switch.Text = toggled and utf8.char(10003) or ""
-        pcall(callback, toggled)
-    end)
-
-    function switch_data:Set(bool)
-        toggled = (typeof(bool) == "boolean") and bool or false
-        switch.Text = toggled and utf8.char(10003) or ""
-        pcall(callback, toggled)
-    end
-
-    function switch_data:SetState(state)
-        return switch_data:Set(state)
-    end
-
-    return switch_data, switch
-end
+						switch_text = tostring(switch_text or "New Switch")
+						callback = typeof(callback) == "function" and callback or function()end
 
 						local switch = Prefabs:FindFirstChild("Switch"):Clone()
 
@@ -1253,8 +1217,13 @@ end
 							pcall(callback,toggled)
 						end
 
+						function switch_data:SetState(state)
+							return switch_data:Set(state)
+						end
+
 						return switch_data, switch
 					end
+
 
 					function tab_data:AddTextBox(textbox_text, callback, textbox_options)
 						textbox_text = tostring(textbox_text or "New TextBox")
@@ -1458,124 +1427,9 @@ end
 					end
 
 					function tab_data:AddDropdown(dropdown_name, callback)
-    local dropdown_data = {}
-    dropdown_name = tostring(dropdown_name or "New Dropdown")
-    callback = typeof(callback) == "function" and callback or function() end
-
-    local dropdown = Prefabs:FindFirstChild("Dropdown"):Clone()
-    local box = dropdown:FindFirstChild("Box")
-    local objects = box:FindFirstChild("Objects")
-    local indicator = dropdown:FindFirstChild("Indicator")
-    dropdown.ZIndex = dropdown.ZIndex + (windows * 10)
-    box.ZIndex = box.ZIndex + (windows * 10)
-    objects.ZIndex = objects.ZIndex + (windows * 10)
-    indicator.ZIndex = indicator.ZIndex + (windows * 10)
-    dropdown:GetChildren()[3].ZIndex = dropdown:GetChildren()[3].ZIndex + (windows * 10)
-
-    dropdown.Parent = new_tab
-    dropdown.Text = "      " .. dropdown_name
-    box.Size = UDim2.new(1, 0, 0, 0)
-
-    local open = false
-    dropdown.MouseButton1Click:Connect(function()
-        open = not open
-
-        local len = (#objects:GetChildren() - 1) * 20
-        if #objects:GetChildren() - 1 >= 10 then
-            len = 10 * 20
-            objects.CanvasSize = UDim2.new(0, 0, (#objects:GetChildren() - 1) * 0.1, 0)
-        end
-
-        if open then
-            if dropdown_open then return end
-            dropdown_open = true
-            Resize(box, {Size = UDim2.new(1, 0, 0, len)}, options.tween_time)
-            Resize(indicator, {Rotation = 90}, options.tween_time)
-        else
-            dropdown_open = false
-            Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, options.tween_time)
-            Resize(indicator, {Rotation = -90}, options.tween_time)
-        end
-    end)
-
-    dropdown_data.Items = {}
-
-    function dropdown_data:Add(n)
-        local object_data = {}
-        n = tostring(n or "New Object")
-
-        local object = Prefabs:FindFirstChild("DropdownButton"):Clone()
-        object.Parent = objects
-        object.Text = n
-        object.ZIndex = object.ZIndex + (windows * 10)
-
-        table.insert(dropdown_data.Items, object)
-
-        object.MouseEnter:Connect(function()
-            object.BackgroundColor3 = options.main_color
-        end)
-        object.MouseLeave:Connect(function()
-            object.BackgroundColor3 = Color3.fromRGB(33, 34, 36)
-        end)
-
-        if open then
-            local len = (#objects:GetChildren() - 1) * 20
-            if #objects:GetChildren() - 1 >= 10 then
-                len = 10 * 20
-                objects.CanvasSize = UDim2.new(0, 0, (#objects:GetChildren() - 1) * 0.1, 0)
-            end
-            Resize(box, {Size = UDim2.new(1, 0, 0, len)}, options.tween_time)
-        end
-
-        object.MouseButton1Click:Connect(function()
-            if dropdown_open then
-                dropdown.Text = "      [ " .. n .. " ]"
-                dropdown_open = false
-                open = false
-                Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, options.tween_time)
-                Resize(indicator, {Rotation = -90}, options.tween_time)
-                pcall(callback, n)
-            end
-        end)
-
-        function object_data:Remove()
-            for i, item in ipairs(dropdown_data.Items) do
-                if item == object then
-                    table.remove(dropdown_data.Items, i)
-                    break
-                end
-            end
-            object:Destroy()
-        end
-
-        return object, object_data
-    end
-
-    function dropdown_data:ClearItems()
-        for _, item in ipairs(self.Items) do
-            if item and item.Destroy then
-                pcall(function() item:Destroy() end)
-            end
-        end
-        self.Items = {}
-        dropdown.Text = "      " .. dropdown_name
-        Resize(box, {Size = UDim2.new(1, 0, 0, 0)}, options.tween_time)
-        Resize(indicator, {Rotation = -90}, options.tween_time)
-    end
-
-    function dropdown_data:RemoveItem(text)
-        for i = #self.Items, 1, -1 do
-            local item = self.Items[i]
-            if item and item.Text == text then
-                pcall(function() item:Destroy() end)
-                table.remove(self.Items, i)
-                break
-            end
-        end
-    end
-
-    return dropdown_data, dropdown
-end
+						local dropdown_data = {}
+						dropdown_name = tostring(dropdown_name or "New Dropdown")
+						callback = typeof(callback) == "function" and callback or function()end
 
 						local dropdown = Prefabs:FindFirstChild("Dropdown"):Clone()
 						local box = dropdown:FindFirstChild("Box")
@@ -1614,6 +1468,9 @@ end
 
 						end)
 
+						-- save items
+						dropdown_data.Items = {}
+
 						function dropdown_data:Add(n)
 							local object_data = {}
 							n = tostring(n or "New Object")
@@ -1623,6 +1480,8 @@ end
 							object.Parent = objects
 							object.Text = n
 							object.ZIndex = object.ZIndex + (windows * 10)
+
+							table.insert(dropdown_data.Items, object)
 
 							object.MouseEnter:Connect(function()
 								object.BackgroundColor3 = options.main_color
@@ -1652,14 +1511,39 @@ end
 							end)
 
 							function object_data:Remove()
+								for i, item in ipairs(dropdown_data.Items) do
+									if item == object then
+										table.remove(dropdown_data.Items, i)
+										break
+									end
+								end
 								object:Destroy()
 							end
 
 							return object, object_data
 						end
 
+						function dropdown_data:ClearItems()
+							for _, item in ipairs(self.Items) do
+								item:Destroy()
+							end
+							self.Items = {}
+							dropdown.Text = "      " .. dropdown_name -- يرجع الاسم الأصلي
+						end
+
+						function dropdown_data:RemoveItem(text)
+							for i, item in ipairs(self.Items) do
+								if item.Text == text then
+									item:Destroy()
+									table.remove(self.Items, i)
+									break
+								end
+							end
+						end
+
 						return dropdown_data, dropdown
 					end
+
 
 					function tab_data:AddColorPicker(callback)
 						local color_picker_data = {}
